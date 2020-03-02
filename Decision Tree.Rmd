@@ -17,6 +17,7 @@ from Preprocessing import *;
 from sklearn.model_selection import train_test_split;
 from sklearn.tree import DecisionTreeClassifier;
 from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import KFold
 from sklearn.metrics import accuracy_score
 from skfeature.function.similarity_based import fisher_score;
 from skfeature.function.statistical_based import gini_index;
@@ -34,7 +35,6 @@ Since the building_id, listing_id, and manager_id are neither categorical or num
 
 ```{python}
 data.drop(['photos','listing_id','building_id','manager_id','street_address','features','description','created','display_address'], axis=1, inplace=True)
-data
 ```
 
 ## Label encode target
@@ -68,10 +68,10 @@ Since the distribution is skewed, we should stratify our data when spliting so i
 
 ```{python}
 X_train, X_test, y_train, y_test = train_test_split(X,y,stratify=y)
-X_train.reset_index(inplace=True, drop=True)
-X_test.reset_index(inplace=True, drop=True)
-y_train.reset_index(inplace=True, drop=True)
-y_test.reset_index(inplace=True, drop=True)
+X_train.reset_index(inplace=True);
+X_test.reset_index(inplace=True);
+y_train.reset_index();
+y_test.reset_index();
 ```
 
 ```{python}
@@ -85,41 +85,73 @@ Since this is only valid for numerica features, we must first take a subset of o
 ```{python}
 # take subset
 numeric = ['bathrooms','bedrooms','latitude','longitude','price','hour_created']
-num_data = data[['bathrooms','bedrooms','latitude','longitude','price','hour_created']]
+num_data = data[['bathrooms','bedrooms','latitude','longitude','price','hour_created','target']]
 ```
 
 ```{python}
-# separate data
-high = train_df[train_df['interest_level'] == 'high']
-med = train_df[train_df['interest_level'] == 'medium']
-low = train_df[train_df['interest_level'] == 'low']
+# separate data by interest level
+high = num_data[num_data['target'] == 2].drop(['target'], axis=1)
+med = num_data[num_data['target'] == 1].drop(['target'], axis=1)
+low = num_data[num_data['target'] == 0].drop(['target'], axis=1)
 ```
 
 ```{python}
-# calculate mean and std for each feature
-avg = np.array([high.mean(),
+# calculate mean of each feature in each class
+avg_if = np.array([high.mean(),
       med.mean(),
       low.mean()])
-std = np.array([high.std(),
+#calculate mean of each feature
+avg_f = np.array(num_data.drop(['target'], axis=1).mean())
+```
+
+```{python}
+# calculate variance for each feature
+var = np.square(np.array([high.std(),
       med.std(),
-      low.std()])
-p = np.array([high.shape[0]/float(data.shape[0]),
+      low.std()]))
+
+# calculate probability of each class
+prob = np.array([high.shape[0]/float(data.shape[0]),
              med.shape[0]/float(data.shape[0]),
              low.shape[0]/float(data.shape[0])]
 )
-glob_avg = num_data.mean()
-p
 ```
+
+```{python}
+fisher = []
+numerator = []
+denomerator = []
+
+for feat in np.arange(0,avg_if.shape[1]):
+    for class_i in np.arange(0,avg_if.shape[0]):
+        numerator.append(np.array(prob[class_i]*np.square(avg_if[class_i][feat]-avg_f[feat])))
+        denomerator.append(np.array(prob[class_i]*var[class_i]))      
+    fisher.append(np.array(numerator).sum()/np.array(denomerator).sum())
+fisher
+```
+
+From the fisher scores, it looks like the hour the price and the hour the listing was created have the best fisher score. The worst was longitude and the rest weren't that far off either with 9 significant digits. 
+
 
 ## First Classifier
 
 The classifier doesn't accept the extracted text features from the previous milestone so for the first classifier they were removed and the classifier was trained for the numerical data only. Gini index was used to determine the best split for each node. The classifier predicted with 64.96% accuracy.
 
 ```{python}
+# perform cross-validation for first set of classifiers
+acc_scores = []
 for train_index, valid_index in kf.split(X):
-    print("TRAIN:", train_index, "VALIDATION:", valid_index)
+    # split data
     X_train, X_valid = X.iloc[train_index], X.iloc[valid_index]
     y_train, y_valid = y[train_index], y[valid_index]
+    # Create classifier object
+    clf = DecisionTreeClassifier(criterion="Gini", random_state=0)
+    # Train Decision Tree Classifer
+    clf = clf.fit(np.array(X_train[numeric]),np.array(y_train),check_input=False)
+    #Predict the response for test dataset
+    y_pred = clf.predict(X_valid[numeric])
+    acc_scores.append(accuracy_score(y_valid, y_pred))
+acc_scores
 ```
 
 ```{python}
