@@ -18,14 +18,16 @@ from sklearn.model_selection import StratifiedKFold,KFold,train_test_split;
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder;
 from sklearn.tree import DecisionTreeClassifier;
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report;
-from skfeature.function.similarity_based import fisher_score;
-from skfeature.function.statistical_based import gini_index;
+from sklearn.feature_extraction.text import TfidfVectorizer
+#from skfeature.function.similarity_based import fisher_score;
+#from skfeature.function.statistical_based import gini_index;
 import seaborn as sns
 plt.style.use('ggplot')
 ```
 
 ```{python}
 data = train_df.reset_index(drop=True)
+test = pd.read_json("test.json")
 ```
 
 # 1. Feature Selection
@@ -138,9 +140,12 @@ fisher
 From the fisher scores, it looks like the address, price, and hour the listing was created have the best fisher score, in that order. The worst was longitude and the rest weren't that far off either with 10 significant digits. 
 
 
+# 2. Train Classifiers
+
+
 ## First Version
 
-The classifier doesn't accept the extracted text features from the previous milestone so for the first classifier they were removed and the classifier was trained for the numerical data only. The 3 features with the highest fisher scores are selected for the first classifier. These are price, hour created, and bedrooms. The default Gini index was used to determine the best split for each node. The classifier predicted with average 61.35% accuracy.
+The classifier doesn't accept the extracted text features from the previous milestone so for the first classifier they were removed and the classifier was trained for the numerical data only. The 3 features with the highest fisher scores are selected for the first classifier. These are price, hour created, and bedrooms. The default Gini index was used to determine the best split for each node. The classifier predicted with average 62.52% accuracy.
 
 ```{python}
 # perform cross-validation for first set of classifiers
@@ -167,7 +172,7 @@ np.array(acc_scores).mean()
 
 ## Second Version
 
-All numeric features were used for this classifier. Gini index was used to determine the best split for each node. The classifier predicted with average 64.30% accuracy. It looks like the classifier has slightly better accuracy with all features.
+All numeric features were used for this classifier. Gini index was used to determine the best split for each node. The classifier predicted with average 64.92% accuracy. It looks like the classifier has slightly better accuracy with all features.
 
 ```{python}
 # perform cross-validation for first set of classifiers
@@ -192,13 +197,13 @@ np.array(acc_scores).mean()
 
 ## Third Version
 
-All numeric features were used for this classifier. Gini index was used to determine the best split for each node. A stratified k-fold cross validation method was used. The classifier predicted with average 64.89% accuracy, which is ever so slightly better than regular k-fold cross validation.
+All numeric features were used for this classifier. Gini index was used to determine the best split for each node. A stratified k-fold cross validation method was used. The classifier predicted with average 65.24% accuracy, which is ever so slightly better than regular k-fold cross validation.
 
 ```{python}
 # perform cross-validation for first set of classifiers
 kf = StratifiedKFold(n_splits=5)
 acc_scores = []
-for train_index, valid_index in kf.split(X_train, y_train):
+for train_index, valid_index in kf.split(X, y):
     # split data
     X_train, X_valid = X.iloc[train_index], X.iloc[valid_index]
     y_train, y_valid = y[train_index], y[valid_index]
@@ -218,13 +223,13 @@ np.array(acc_scores).mean()
 
 ## Fourth
 
-All numeric features were used for this classifier. Entropy was used to determine the best split for each node. A stratified k-fold cross validation method was used. The classifier predicted with average 64.28% accuracy, which is ever so slightly worse than regular k-fold cross validation.
+All numeric features were used for this classifier. Entropy was used to determine the best split for each node. A stratified k-fold cross validation method was used. The classifier predicted with average 65.58% accuracy, which is ever so slightly worse than regular k-fold cross validation.
 
 ```{python}
 # perform cross-validation for first set of classifiers
 kf = StratifiedKFold(n_splits=5)
 acc_scores = []
-for train_index, valid_index in kf.split(X_train, y_train):
+for train_index, valid_index in kf.split(X, y):
     # split data
     X_train, X_valid = X.iloc[train_index], X.iloc[valid_index]
     y_train, y_valid = y[train_index], y[valid_index]
@@ -244,13 +249,13 @@ np.array(acc_scores).mean()
 
 ## Fifth Version
 
-All numeric features were used for this classifier. Gini was used to determine the best split for each node. A stratified k-fold cross validation method was used. Minimum support was changed to 3 to combat overfitting. The classifier predicted with average 64.28% accuracy, which is ever so slightly worse than regular k-fold cross validation.
+All numeric features were used for this classifier. Gini was used to determine the best split for each node. A stratified k-fold cross validation method was used. Minimum support was changed to 3 to combat overfitting. The classifier predicted with average 66.11% accuracy, which is ever so slightly worse than regular k-fold cross validation.
 
 ```{python}
 # perform cross-validation for first set of classifiers
 kf = StratifiedKFold(n_splits=5)
 acc_scores = []
-for train_index, valid_index in kf.split(X_train, y_train):
+for train_index, valid_index in kf.split(X, y):
     # split data
     X_train, X_valid = X.iloc[train_index], X.iloc[valid_index]
     y_train, y_valid = y[train_index], y[valid_index]
@@ -280,7 +285,93 @@ for i in feat:
 ```
 
 ```{python}
-X.join(pd.DataFrame(np.array(feat_list).reshape(49197,79)))
+X2 = pd.DataFrame(np.array(feat_list).reshape(np.array(feat_list).shape[0],np.array(feat_list).shape[2]))
+X2 = X[numeric].join(X2)
+```
+
+## Process test input
+
+```{python}
+test = pd.read_json("test.json")
+test["created"] = pd.to_datetime(test["created"])
+# add hour created column
+test["hour_created"] = test["created"].dt.hour
+```
+
+## Label encode
+
+```{python}
+test["address"] = test["display_address"].astype('category')
+test["address"] = test["address"].cat.codes
+```
+
+```{python}
+# convert features list to string
+test['features'] = test['features'].apply(lambda x: ' '.join(x))
+```
+
+```{python}
+# extract features using tfidf
+vectorizer = TfidfVectorizer(analyzer='word', stop_words='english', token_pattern=r'^[a-zA-Z][a-zA-Z]+',max_features=79)
+vectorizer.fit(test['features'].values);
+test['feat_vect'] = test['features'].apply(lambda x: vectorizer.transform([x]))
+```
+
+```{python}
+feat = test['feat_vect'].apply(lambda x: x.toarray().tolist())
+feat_list = []
+for i in feat:
+    feat_list.append(i)
+```
+
+```{python}
+#X2 = X[numeric].join(pd.DataFrame(np.array(feat_list).reshape(49197,79)))
+test2 = pd.DataFrame(np.array(feat_list).reshape(np.array(feat_list).shape[0],np.array(feat_list).shape[2]))
+```
+
+```{python}
+test = test.join(test2)
+```
+
+```{python}
+test.drop(['photos','listing_id','building_id','manager_id','street_address','features','description','created','display_address','feat_vect'], axis=1, inplace=True)
+test
+```
+
+## Sixth Version
+
+All numeric features were used for this classifier. Gini was used to determine the best split for each node. A stratified k-fold cross validation method was used. Minimum support was changed to 3 to combat overfitting. The classifier predicted with average 66.11% accuracy, which is ever so slightly worse than regular k-fold cross validation.
+
+```{python}
+X2
+```
+
+```{python}
+clf = DecisionTreeClassifier(criterion="entropy", random_state=0,min_samples_leaf=3)
+clf = clf.fit(np.array(X2),np.array(y),check_input=False)
+```
+
+```{python}
+# perform cross-validation for first set of classifiers
+kf = StratifiedKFold(n_splits=5)
+acc_scores = []
+for train_index, valid_index in kf.split(X2, y):
+    # split data
+    X_train, X_valid = X.iloc[train_index], X.iloc[valid_index]
+    y_train, y_valid = y[train_index], y[valid_index]
+    print(X_train)
+    # Create classifier object
+    clf = DecisionTreeClassifier(criterion="entropy", random_state=0,min_samples_leaf=3)
+    # Train Decision Tree Classifer
+    clf = clf.fit(np.array(X_train),np.array(y_train),check_input=False)
+    #Predict the response for test dataset
+    y_pred = clf.predict(X_valid)
+    acc_scores.append(accuracy_score(y_valid, y_pred))
+acc_scores
+```
+
+```{python}
+np.array(acc_scores).mean()
 ```
 
 ## Confusion Matrix
