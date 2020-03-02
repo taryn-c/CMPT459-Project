@@ -15,7 +15,7 @@ jupyter:
 ```{python}
 from Preprocessing import *;
 from sklearn.model_selection import StratifiedKFold,KFold,train_test_split;
-from sklearn.preprocessing import LabelEncoder;
+from sklearn.preprocessing import LabelEncoder, OneHotEncoder;
 from sklearn.tree import DecisionTreeClassifier;
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report;
 from skfeature.function.similarity_based import fisher_score;
@@ -144,9 +144,10 @@ The classifier doesn't accept the extracted text features from the previous mile
 
 ```{python}
 # perform cross-validation for first set of classifiers
+kf = KFold(n_splits=5)
 acc_scores = []
 top3 = ['price', 'hour_created', 'address']
-for train_index, valid_index in kf.split(X_train):
+for train_index, valid_index in kf.split(X):
     # split data
     X_train, X_valid = X.iloc[train_index], X.iloc[valid_index]
     y_train, y_valid = y[train_index], y[valid_index]
@@ -267,19 +268,26 @@ acc_scores
 np.array(acc_scores).mean()
 ```
 
-## Hot encode text features 
+## Hot encode features vector
 
+The Decision Tree classifier in the sklearn sorts each feature to split the data and doesn't support features that are vectors. So to use any text features we must hot encode them. However, the description vectors are 1119 long so we will only do the features. Looking at the two text features, it seems like description might not be that helpful because there are a lot of irrelevant words/strings in most of them like 'XXX'.  
+
+```{python}
+feat = data['feat_vect'].apply(lambda x: x.toarray().tolist())
+feat_list = []
+for i in feat:
+    feat_list.append(i)
+```
+
+```{python}
+X.join(pd.DataFrame(np.array(feat_list).reshape(49197,79)))
+```
 
 ## Confusion Matrix
 
 ```{python}
 conf_matrix = confusion_matrix(y_valid, y_pred)
-precision = []
-recall = []
-for i in range(0,len(conf_matrix)):
-    precision.append(conf_matrix[i][i]/float(conf_matrix[:,i].sum()))
-    recall.append(conf_matrix[i][i]/float(conf_matrix[i,:].sum()))
-precision
+conf_matrix
 ```
 
 ```{python}
