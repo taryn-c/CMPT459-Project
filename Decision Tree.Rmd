@@ -17,7 +17,7 @@ from Preprocessing import *;
 from sklearn.model_selection import StratifiedKFold,KFold,train_test_split;
 from sklearn.preprocessing import LabelEncoder;
 from sklearn.tree import DecisionTreeClassifier;
-from sklearn.metrics import accuracy_score, precision_recall_curve, average_precision_score;
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report;
 from skfeature.function.similarity_based import fisher_score;
 from skfeature.function.statistical_based import gini_index;
 import seaborn as sns
@@ -239,4 +239,60 @@ acc_scores
 
 ```{python}
 np.array(acc_scores).mean()
+```
+
+## Fifth Version
+
+All numeric features were used for this classifier. Gini was used to determine the best split for each node. A stratified k-fold cross validation method was used. Minimum support was changed to 3 to combat overfitting. The classifier predicted with average 64.28% accuracy, which is ever so slightly worse than regular k-fold cross validation.
+
+```{python}
+# perform cross-validation for first set of classifiers
+kf = StratifiedKFold(n_splits=5)
+acc_scores = []
+for train_index, valid_index in kf.split(X_train, y_train):
+    # split data
+    X_train, X_valid = X.iloc[train_index], X.iloc[valid_index]
+    y_train, y_valid = y[train_index], y[valid_index]
+    # Create classifier object
+    clf = DecisionTreeClassifier(criterion="entropy", random_state=0,min_samples_leaf=3)
+    # Train Decision Tree Classifer
+    clf = clf.fit(np.array(X_train[numeric]),np.array(y_train),check_input=False)
+    #Predict the response for test dataset
+    y_pred = clf.predict(X_valid[numeric])
+    acc_scores.append(accuracy_score(y_valid, y_pred))
+acc_scores
+```
+
+```{python}
+np.array(acc_scores).mean()
+```
+
+## Hot encode text features 
+
+
+## Confusion Matrix
+
+```{python}
+conf_matrix = confusion_matrix(y_valid, y_pred)
+precision = []
+recall = []
+for i in range(0,len(conf_matrix)):
+    precision.append(conf_matrix[i][i]/float(conf_matrix[:,i].sum()))
+    recall.append(conf_matrix[i][i]/float(conf_matrix[i,:].sum()))
+precision
+```
+
+```{python}
+print(classification_report(y_valid, y_pred, target_names=['low', 'medium','high']))
+```
+
+## Multi-class log loss output
+
+```{python}
+# Test output for log loss
+y_prob = clf.predict_proba(X_test[numeric])
+```
+
+```{python}
+
 ```
