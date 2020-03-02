@@ -14,11 +14,10 @@ jupyter:
 
 ```{python}
 from Preprocessing import *;
-from sklearn.model_selection import train_test_split;
+from sklearn.model_selection import StratifiedKFold,KFold,train_test_split;
+from sklearn.preprocessing import LabelEncoder;
 from sklearn.tree import DecisionTreeClassifier;
-from sklearn.model_selection import StratifiedKFold
-from sklearn.model_selection import KFold
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, precision_recall_curve, average_precision_score;
 from skfeature.function.similarity_based import fisher_score;
 from skfeature.function.statistical_based import gini_index;
 import seaborn as sns
@@ -34,15 +33,21 @@ data = train_df.reset_index(drop=True)
 Since the building_id, listing_id, and manager_id are neither categorical or numeric data, it really isn't relevant for our model. We will remove these attributes. We will also remove the photos column because we won't be using this in our model either. We will also remove street_address because we can use the display_address as a categorical value since this is just the genral street that the listing is on. This helps identify the general neighbourhood the listing is in for the buyer. The description, created, and features columns are removed because these are represented by newly extracted feature columns from the previous milestone.
 
 ```{python}
-data.drop(['photos','listing_id','building_id','manager_id','street_address','features','description','created','display_address'], axis=1, inplace=True)
+data.drop(['photos','listing_id','building_id','manager_id','street_address','features','description','created'], axis=1, inplace=True)
 ```
 
-## Label encode target
+## Label encode
 
 ```{python}
 data["interest_level"] = data["interest_level"].astype('category')
 data["target"] = data["interest_level"].cat.codes
 data.drop(['interest_level'], axis=1, inplace=True)
+```
+
+```{python}
+data["address"] = data["display_address"].astype('category')
+data["address"] = data["address"].cat.codes
+data.drop(['display_address'], axis=1, inplace=True)
 ```
 
 ## Split our data
@@ -75,7 +80,7 @@ y_test.reset_index();
 ```
 
 ```{python}
-kf = StratifiedKFold(n_splits=5)
+kf = KFold(n_splits=5)
 ```
 
 ## Fisher score
@@ -84,8 +89,8 @@ Since this is only valid for numerica features, we must first take a subset of o
 
 ```{python}
 # take subset
-numeric = ['bathrooms','bedrooms','latitude','longitude','price','hour_created']
-num_data = data[['bathrooms','bedrooms','latitude','longitude','price','hour_created','target']]
+numeric = ['bathrooms','bedrooms','latitude','longitude','price','hour_created','address']
+num_data = data[['bathrooms','bedrooms','latitude','longitude','price','hour_created','address','target']]
 ```
 
 ```{python}
@@ -130,22 +135,48 @@ for feat in np.arange(0,avg_if.shape[1]):
 fisher
 ```
 
-From the fisher scores, it looks like the hour the price and the hour the listing was created have the best fisher score. The worst was longitude and the rest weren't that far off either with 9 significant digits. 
+From the fisher scores, it looks like the address, price, and hour the listing was created have the best fisher score, in that order. The worst was longitude and the rest weren't that far off either with 10 significant digits. 
 
 
-## First Classifier
+## First Version
 
-The classifier doesn't accept the extracted text features from the previous milestone so for the first classifier they were removed and the classifier was trained for the numerical data only. Gini index was used to determine the best split for each node. The classifier predicted with 64.96% accuracy.
+The classifier doesn't accept the extracted text features from the previous milestone so for the first classifier they were removed and the classifier was trained for the numerical data only. The 3 features with the highest fisher scores are selected for the first classifier. These are price, hour created, and bedrooms. The default Gini index was used to determine the best split for each node. The classifier predicted with average 61.35% accuracy.
 
 ```{python}
 # perform cross-validation for first set of classifiers
 acc_scores = []
-for train_index, valid_index in kf.split(X):
+top3 = ['price', 'hour_created', 'address']
+for train_index, valid_index in kf.split(X_train):
     # split data
     X_train, X_valid = X.iloc[train_index], X.iloc[valid_index]
     y_train, y_valid = y[train_index], y[valid_index]
     # Create classifier object
-    clf = DecisionTreeClassifier(criterion="Gini", random_state=0)
+    clf = DecisionTreeClassifier(criterion="gini", random_state=0)
+    # Train Decision Tree Classifer
+    clf = clf.fit(np.array(X_train[top3]),np.array(y_train),check_input=False)
+    #Predict the response for test dataset
+    y_pred = clf.predict(X_valid[top3])
+    acc_scores.append(accuracy_score(y_valid, y_pred))
+acc_scores
+```
+
+```{python}
+np.array(acc_scores).mean()
+```
+
+## Second Version
+
+All numeric features were used for this classifier. Gini index was used to determine the best split for each node. The classifier predicted with average 64.30% accuracy. It looks like the classifier has slightly better accuracy with all features.
+
+```{python}
+# perform cross-validation for first set of classifiers
+acc_scores = []
+for train_index, valid_index in kf.split(X_train):
+    # split data
+    X_train, X_valid = X.iloc[train_index], X.iloc[valid_index]
+    y_train, y_valid = y[train_index], y[valid_index]
+    # Create classifier object
+    clf = DecisionTreeClassifier(criterion="gini", random_state=0)
     # Train Decision Tree Classifer
     clf = clf.fit(np.array(X_train[numeric]),np.array(y_train),check_input=False)
     #Predict the response for test dataset
@@ -155,20 +186,57 @@ acc_scores
 ```
 
 ```{python}
-# Create classifier object
-clf = DecisionTreeClassifier(criterion="Gini", random_state=0)
+np.array(acc_scores).mean()
+```
+
+## Third Version
+
+All numeric features were used for this classifier. Gini index was used to determine the best split for each node. A stratified k-fold cross validation method was used. The classifier predicted with average 64.89% accuracy, which is ever so slightly better than regular k-fold cross validation.
+
+```{python}
+# perform cross-validation for first set of classifiers
+kf = StratifiedKFold(n_splits=5)
+acc_scores = []
+for train_index, valid_index in kf.split(X_train, y_train):
+    # split data
+    X_train, X_valid = X.iloc[train_index], X.iloc[valid_index]
+    y_train, y_valid = y[train_index], y[valid_index]
+    # Create classifier object
+    clf = DecisionTreeClassifier(criterion="gini", random_state=0)
+    # Train Decision Tree Classifer
+    clf = clf.fit(np.array(X_train[numeric]),np.array(y_train),check_input=False)
+    #Predict the response for test dataset
+    y_pred = clf.predict(X_valid[numeric])
+    acc_scores.append(accuracy_score(y_valid, y_pred))
+acc_scores
 ```
 
 ```{python}
-# Train Decision Tree Classifer
-clf = clf.fit(np.array(X_train[numeric]),np.array(y_train),check_input=False)
+np.array(acc_scores).mean()
+```
+
+## Fourth
+
+All numeric features were used for this classifier. Entropy was used to determine the best split for each node. A stratified k-fold cross validation method was used. The classifier predicted with average 64.28% accuracy, which is ever so slightly worse than regular k-fold cross validation.
+
+```{python}
+# perform cross-validation for first set of classifiers
+kf = StratifiedKFold(n_splits=5)
+acc_scores = []
+for train_index, valid_index in kf.split(X_train, y_train):
+    # split data
+    X_train, X_valid = X.iloc[train_index], X.iloc[valid_index]
+    y_train, y_valid = y[train_index], y[valid_index]
+    # Create classifier object
+    clf = DecisionTreeClassifier(criterion="entropy", random_state=0)
+    # Train Decision Tree Classifer
+    clf = clf.fit(np.array(X_train[numeric]),np.array(y_train),check_input=False)
+    #Predict the response for test dataset
+    y_pred = clf.predict(X_valid[numeric])
+    acc_scores.append(accuracy_score(y_valid, y_pred))
+acc_scores
 ```
 
 ```{python}
-#Predict the response for test dataset
-y_pred = clf.predict(X_test[numeric])
-```
-
-```{python}
-accuracy_score(y_test, y_pred)
+np.array(acc_scores).mean()
 ```
