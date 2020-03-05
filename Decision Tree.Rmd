@@ -14,7 +14,7 @@ jupyter:
 
 # Phase 2: Decision Tree Classifier
 
-
+```{python}
 from Preprocessing import *;
 from sklearn.model_selection import StratifiedKFold,KFold,train_test_split;
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder;
@@ -25,6 +25,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer,CountVectorizer;
 from pandas.api.types import CategoricalDtype
 import seaborn as sns
 plt.style.use('ggplot')
+```
 
 ```{python}
 data = train_df.reset_index(drop=True)
@@ -72,11 +73,17 @@ data.drop(['manager_id'], axis=1, inplace=True)
 
 ## Split our data
 
-I will split our input and target variables into X and y respectively. Next, we will check the distribution of our target variable to see if we must stratify our training and testing data samples.
+I will split our input and target variables into X and y respectively. We will also split into training and test data so we can see if our models are overfitting the data.
 
 ```{python}
 X = data.drop(['target'], axis=1)
 y = data['target']
+X_tr, X_test, y_tr, y_test = train_test_split(X,y)
+```
+
+```{python}
+X_test.reset_index(inplace=True,drop=True)
+X_tr.reset_index(inplace=True,drop=True)
 ```
 
 ## Fisher score
@@ -136,7 +143,7 @@ top3 = ['building', 'manager', 'address']
 top5 = ['building', 'manager', 'address','price', 'hour_created']
 ```
 
-From the fisher scores, it looks like the building, address, and manager have the top 3 fisher scores, in that order.  Price and hour the listing was created also have decent fisher scores. The worst was longitude and the rest weren't that far off either with 10 significant digits. 
+From the Fisher scores, it looks like the building, address, and manager have the top 3 fisher scores, in that order.  Price and hour the listing was created also have decent fisher scores. The worst was longitude and the rest weren't that far off either with 10 significant digits. 
 
 
 # 2. Train Classifiers
@@ -144,13 +151,14 @@ From the fisher scores, it looks like the building, address, and manager have th
 
 ## First Version
 
-The classifier doesn't accept the extracted text features from the previous milestone so for the first classifier they were removed and the classifier was trained for the numerical data only. The 3 features with the highest fisher scores are selected for the first classifier. These are price, hour created, and bedrooms. The default Gini index was used to determine the best split for each node. The classifier predicted with average 63.32% accuracy.
+The classifier doesn't accept the extracted text features from the previous milestone so for the first classifier they were removed and the classifier was trained for the numerical data only. The 3 features with the highest fisher scores are selected for the first classifier. These are price, hour created, and bedrooms. The default Gini index was used to determine the best split for each node. The classifier predicted with average 63.32% accuracy. You can see the classifier is biased and has higher precision, recall, and f1 scores for the low interest class. More than triple the high interest. It also overfits to the training data because the accuracy for the test dataset is almost 20% higher.
 
 ```{python}
 # perform cross-validation for first set of classifiers
 kf = KFold(n_splits=5)
 acc_scores = []
-for train_index, valid_index in kf.split(X):
+best_acc = 0
+for train_index, valid_index in kf.split(X_tr):
     # split data
     X_train, X_valid = X.iloc[train_index], X.iloc[valid_index]
     y_train, y_valid = y[train_index], y[valid_index]
@@ -160,7 +168,11 @@ for train_index, valid_index in kf.split(X):
     clf = clf.fit(np.array(X_train[top3]),np.array(y_train),check_input=False)
     #Predict the response for test dataset
     y_pred = clf.predict(X_valid[top3])
-    acc_scores.append(accuracy_score(y_valid, y_pred))
+    acc = accuracy_score(y_valid, y_pred)
+    acc_scores.append(acc)
+    if acc > best_acc:
+        best_acc = acc
+        best_clf = clf
 acc_scores
 ```
 
@@ -170,6 +182,13 @@ np.array(acc_scores).mean()
 
 ```{python}
 print(classification_report(y_valid, y_pred, target_names=['high', 'medium','low']))
+```
+
+```{python}
+# Check overfitting
+y_pred = clf.predict(X_test[top3])
+acc = accuracy_score(y_test, y_pred)
+acc
 ```
 
 ## Second Version
@@ -180,7 +199,7 @@ Top 5 features according to Fisher scores were used for this classifier. Gini in
 # perform cross-validation for first set of classifiers
 kf = KFold(n_splits=5)
 acc_scores = []
-for train_index, valid_index in kf.split(X):
+for train_index, valid_index in kf.split(X_tr):
     # split data
     X_train, X_valid = X.iloc[train_index], X.iloc[valid_index]
     y_train, y_valid = y[train_index], y[valid_index]
@@ -190,7 +209,11 @@ for train_index, valid_index in kf.split(X):
     clf = clf.fit(np.array(X_train[top5]),np.array(y_train),check_input=False)
     #Predict the response for test dataset
     y_pred = clf.predict(X_valid[top5])
-    acc_scores.append(accuracy_score(y_valid, y_pred))
+    acc = accuracy_score(y_valid, y_pred)
+    acc_scores.append(acc)
+    if acc > best_acc:
+        best_acc = acc
+        best_clf = clf
 acc_scores
 ```
 
@@ -200,6 +223,13 @@ np.array(acc_scores).mean()
 
 ```{python}
 print(classification_report(y_valid, y_pred, target_names=['high', 'medium','low']))
+```
+
+```{python}
+# Check overfitting
+y_pred = clf.predict(X_test[top5])
+acc = accuracy_score(y_test, y_pred)
+acc
 ```
 
 ## Third Version
@@ -210,7 +240,7 @@ All numeric features were used for this classifier. The default Gini index was u
 # perform cross-validation for first set of classifiers
 kf = KFold(n_splits=5)
 acc_scores = []
-for train_index, valid_index in kf.split(X):
+for train_index, valid_index in kf.split(X_tr):
     # split data
     X_train, X_valid = X.iloc[train_index], X.iloc[valid_index]
     y_train, y_valid = y[train_index], y[valid_index]
@@ -220,7 +250,11 @@ for train_index, valid_index in kf.split(X):
     clf = clf.fit(np.array(X_train[numeric]),np.array(y_train),check_input=False)
     #Predict the response for test dataset
     y_pred = clf.predict(X_valid[numeric])
-    acc_scores.append(accuracy_score(y_valid, y_pred))
+    acc = accuracy_score(y_valid, y_pred)
+    acc_scores.append(acc)
+    if acc > best_acc:
+        best_acc = acc
+        best_clf = clf
 acc_scores
 ```
 
@@ -230,6 +264,13 @@ np.array(acc_scores).mean()
 
 ```{python}
 print(classification_report(y_valid, y_pred, target_names=['high', 'medium','low']))
+```
+
+```{python}
+# Check overfitting
+y_pred = clf.predict(X_test[numeric])
+acc = accuracy_score(y_test, y_pred)
+acc
 ```
 
 ## Fourth Version
@@ -252,7 +293,7 @@ Since the distribution of our target is skewed, we should stratify our data when
 # perform cross-validation for first set of classifiers
 kf = StratifiedKFold(n_splits=5)
 acc_scores = []
-for train_index, valid_index in kf.split(X, y):
+for train_index, valid_index in kf.split(X_tr, y_tr):
     # split data
     X_train, X_valid = X.iloc[train_index], X.iloc[valid_index]
     y_train, y_valid = y[train_index], y[valid_index]
@@ -262,7 +303,11 @@ for train_index, valid_index in kf.split(X, y):
     clf = clf.fit(np.array(X_train[numeric]),np.array(y_train),check_input=False)
     #Predict the response for test dataset
     y_pred = clf.predict(X_valid[numeric])
-    acc_scores.append(accuracy_score(y_valid, y_pred))
+    acc = accuracy_score(y_valid, y_pred)
+    acc_scores.append(acc)
+    if acc > best_acc:
+        best_acc = acc
+        best_clf = clf
 acc_scores
 ```
 
@@ -272,6 +317,13 @@ np.array(acc_scores).mean()
 
 ```{python}
 print(classification_report(y_valid, y_pred, target_names=['high', 'medium','low']))
+```
+
+```{python}
+# Check overfitting
+y_pred = clf.predict(X_test[numeric])
+acc = accuracy_score(y_test, y_pred)
+acc
 ```
 
 ## Fifth Version
@@ -282,7 +334,8 @@ All numeric features were used for this classifier. Entropy was used to determin
 # perform cross-validation for first set of classifiers
 kf = StratifiedKFold(n_splits=5)
 acc_scores = []
-for train_index, valid_index in kf.split(X, y):
+best_acc = 0
+for train_index, valid_index in kf.split(X_tr, y_tr):
     # split data
     X_train, X_valid = X.iloc[train_index], X.iloc[valid_index]
     y_train, y_valid = y[train_index], y[valid_index]
@@ -292,7 +345,11 @@ for train_index, valid_index in kf.split(X, y):
     clf = clf.fit(np.array(X_train[numeric]),np.array(y_train),check_input=False)
     #Predict the response for test dataset
     y_pred = clf.predict(X_valid[numeric])
-    acc_scores.append(accuracy_score(y_valid, y_pred))
+    acc = accuracy_score(y_valid, y_pred)
+    acc_scores.append(acc)
+    if acc > best_acc:
+        best_acc = acc
+        best_clf = clf
 acc_scores
 ```
 
@@ -302,6 +359,13 @@ np.array(acc_scores).mean()
 
 ```{python}
 print(classification_report(y_valid, y_pred, target_names=['high', 'medium','low']))
+```
+
+```{python}
+# Check overfitting
+y_pred = clf.predict(X_test[numeric])
+acc = accuracy_score(y_test, y_pred)
+acc
 ```
 
 ## Sixth Version
@@ -312,7 +376,7 @@ All numeric features were used for this classifier. Gini index was used to deter
 # perform cross-validation for first set of classifiers
 kf = StratifiedKFold(n_splits=5)
 acc_scores = []
-for train_index, valid_index in kf.split(X, y):
+for train_index, valid_index in kf.split(X_tr, y_tr):
     # split data
     X_train, X_valid = X.iloc[train_index], X.iloc[valid_index]
     y_train, y_valid = y[train_index], y[valid_index]
@@ -322,7 +386,11 @@ for train_index, valid_index in kf.split(X, y):
     clf = clf.fit(np.array(X_train[numeric]),np.array(y_train),check_input=False)
     #Predict the response for test dataset
     y_pred = clf.predict(X_valid[numeric])
-    acc_scores.append(accuracy_score(y_valid, y_pred))
+    acc = accuracy_score(y_valid, y_pred)
+    acc_scores.append(acc)
+    if acc > best_acc:
+        best_acc = acc
+        best_clf = clf
 acc_scores
 ```
 
@@ -334,12 +402,24 @@ np.array(acc_scores).mean()
 print(classification_report(y_valid, y_pred, target_names=['high', 'medium','low']))
 ```
 
-## Hot encode features vector
+```{python}
+# Check overfitting
+y_pred = clf.predict(X_test[numeric])
+acc = accuracy_score(y_test, y_pred)
+acc
+```
 
-The Decision Tree classifier in the sklearn sorts each feature to split the data and doesn't support features that are vectors. So to use any text features we must hot encode them. However, the description vectors are 1119 long so we will only do the features. Looking at the two text features, it seems like description might not be that helpful because there are a lot of irrelevant words/strings in most of them like 'XXX'.  
+## Seventh Version
+
+We can introduce our extracted text features for this version.
+
+
+### Hot encode features vector
+
+The Decision Tree classifier in the sklearn sorts each feature to split the data and doesn't support features that are vectors. So to use any text features we must hot encode them. However, the description vectors are 1119 long so we will only do the features. Looking at the two text features, it seems like description might not be that helpful because there are a lot of irrelevant words/strings in most of them like 'XXX'. 
 
 ```{python}
-feat = data['feat_vect'].apply(lambda x: x.toarray().tolist())
+feat = X_tr['feat_vect'].apply(lambda x: x.toarray().tolist())
 feat_list = []
 for i in feat:
     feat_list.append(i)
@@ -347,18 +427,28 @@ for i in feat:
 
 ```{python}
 X2 = pd.DataFrame(np.array(feat_list).reshape(np.array(feat_list).shape[0],np.array(feat_list).shape[2]))
-X2 = X[numeric].join(X2)
+X2 = X_tr[numeric].join(X2)
 ```
 
-## Seventh Version
+```{python}
+feat = X_test['feat_vect'].apply(lambda x: x.toarray().tolist())
+feat_list = []
+for i in feat:
+    feat_list.append(i)
+```
 
-All numeric features and the hot encoded features were used for this classifier. Gini was used to determine the best split for each node. A stratified k-fold cross validation method was used. Minimum support was changed to 3 to combat overfitting. The classifier predicted with average 66.67% accuracy, which is slightly better than the previous. Looking at the tfidf vectors of the features column, it looks like each one only has one value out of the 79 word dictionary. The features of most listing must be very similar or have very rare words.
+```{python}
+X_test2 = pd.DataFrame(np.array(feat_list).reshape(np.array(feat_list).shape[0],np.array(feat_list).shape[2]))
+X_test = X_test[numeric].join(X_test2)
+```
+
+All numeric features and the hot encoded features were used for this classifier. Gini was used to determine the best split for each node. A stratified k-fold cross validation method was used. Minimum support was changed to 3 to combat overfitting seen from the previous versions. The classifier predicted with average 53.55% accuracy, which is significantly worse than the previous. Looking at the tfidf vectors of the features column, it looks like each one only has one value out of the 79 word dictionary. The features of most listing must be very similar or have very rare words. The classifier is no longer overfitting but the hot encoded data is throwing off the classifier. It must be splitting the data using these columns closer to the root node, which isn't very helpful.
 
 ```{python}
 # perform cross-validation for first set of classifiers
 kf = StratifiedKFold(n_splits=5)
 acc_scores = []
-for train_index, valid_index in kf.split(X2, y):
+for train_index, valid_index in kf.split(X2, y_tr):
     # split data
     X_train, X_valid = X2.iloc[train_index], X2.iloc[valid_index]
     y_train, y_valid = y[train_index], y[valid_index]
@@ -368,7 +458,11 @@ for train_index, valid_index in kf.split(X2, y):
     clf = clf.fit(np.array(X_train),np.array(y_train),check_input=False)
     #Predict the response for test dataset
     y_pred = clf.predict(X_valid)
-    acc_scores.append(accuracy_score(y_valid, y_pred))
+    acc = accuracy_score(y_valid, y_pred)
+    acc_scores.append(acc)
+    if acc > best_acc:
+        best_acc = acc
+        best_clf = clf
 acc_scores
 ```
 
@@ -380,16 +474,22 @@ np.array(acc_scores).mean()
 print(classification_report(y_valid, y_pred, target_names=['high', 'medium','low']))
 ```
 
-## Seventh Version
+```{python}
+# Check overfitting
+y_pred = clf.predict(X_test)
+acc = accuracy_score(y_test, y_pred)
+acc
+```
 
-All numeric features and the features were used for this classifier. Gini index seemed to do slightly better so it was used to determine the best split for each node. A stratified k-fold cross validation method was used. Minimum support was changed to 100 and the classifier predicted with average 71.21% accuracy, which is an improvement. Recall and f1-score for medium interest class was at an all time high with 0.92 and 0.83 respectively. Precision seemed to improve for all classes by 0.17 for low and 0.06 for high. 
+## Eighth Version
+
+All numeric features and the features were used for this classifier. Gini index seemed to do slightly better so it was used to determine the best split for each node. A stratified k-fold cross validation method was used. Minimum support was changed to 100 and the classifier predicted with average 69.55% accuracy, which is a large improvement. Recall the low interest class was at an all time high with 1.00. The classifier doesn't seem to be predicting the medium or high interest classes corectly at all. There seems to be no overfitting since the performance on the test dataset is only off by 0.01%.
 
 ```{python}
 # perform cross-validation for first set of classifiers
 kf = StratifiedKFold(n_splits=5)
 acc_scores = []
-best_acc = 0
-for train_index, valid_index in kf.split(X2, y):
+for train_index, valid_index in kf.split(X2, y_tr):
     # split data
     X_train, X_valid = X2.iloc[train_index], X2.iloc[valid_index]
     y_train, y_valid = y[train_index], y[valid_index]
@@ -397,6 +497,47 @@ for train_index, valid_index in kf.split(X2, y):
     clf = DecisionTreeClassifier(criterion="gini", random_state=0,min_samples_leaf=100)
     # Train Decision Tree Classifer
     clf = clf.fit(np.array(X_train),np.array(y_train),check_input=False)
+    #Predict the response for test dataset
+    y_pred = clf.predict(X_valid)
+    acc = accuracy_score(y_valid, y_pred)
+    acc_scores.append(acc)
+    if acc > best_acc:
+        best_acc = acc
+        best_clf = clf
+acc_scores
+```
+
+```{python}
+np.array(acc_scores).mean()
+```
+
+```{python}
+print(classification_report(y_valid, y_pred, target_names=['high', 'medium','low']))
+```
+
+```{python}
+# Check overfitting
+y_pred = clf.predict(X_test)
+acc = accuracy_score(y_test, y_pred)
+acc
+```
+
+## Eighth Version
+
+Here we're trying a Random Forest to try and combat inconsistent data creating very different trees. Playing with the parameters, number of folds, and features also gets the same results, on average, as before. Although we do get one classifier that performs the best with an accuracy of 70.81%. This classifier will be used for testing.
+
+```{python}
+# perform cross-validation for first set of classifiers
+kf = StratifiedKFold(n_splits=10)
+acc_scores = []
+for train_index, valid_index in kf.split(X2, y_tr):
+    # split data
+    X_train, X_valid = X2.iloc[train_index], X2.iloc[valid_index]
+    y_train, y_valid = y[train_index], y[valid_index]
+    # Create classifier object
+    clf = RandomForestClassifier(criterion="gini", random_state=0,min_samples_leaf=20,n_estimators=50,min_samples_split=100)
+    # Train Decision Tree Classifer
+    clf = clf.fit(np.array(X_train),np.array(y_train))
     #Predict the response for test dataset
     y_pred = clf.predict(X_valid)
     acc = accuracy_score(y_valid, y_pred)
@@ -412,6 +553,13 @@ np.array(acc_scores).mean()
 
 ```{python}
 print(classification_report(y_valid, y_pred, target_names=['high', 'medium','low']))
+```
+
+```{python}
+# Check overfitting
+y_pred = clf.predict(X_test)
+acc = accuracy_score(y_test, y_pred)
+acc
 ```
 
 # 3. Testing
@@ -474,12 +622,15 @@ test = test.join(test2)
 
 ```{python}
 test.drop(['photos','street_address','features','description','created','display_address','feat_vect'], axis=1, inplace=True)
-test
 ```
 
 # 4. Predictions on  test dataset
 
-Score (multiclass log-loss) = 1.09861
+Score (multiclass log-loss) = 0.79164 using a Random Forest classifier, our eighth version. The benchmark of sample submission is 0.78598.
+
+- Decision-tree learners can create over-complex trees that do not generalise the data well. This is called overfitting. Mechanisms such as pruning (not currently supported), setting the minimum number of samples required at a leaf node or setting the maximum depth of the tree are necessary to avoid this problem.
+
+- Decision trees can be unstable because small variations in the data might result in a completely different tree being generated. This problem is mitigated by using decision trees within an ensemble.
 
 ```{python}
 # use best classifier on test dataset
