@@ -1,12 +1,12 @@
-sad_mining.ipynb
+*.ipynb
 .ipynb_checkpoints
-train.json
-test.json
+*.json
 images_sample.zip
 Kaggle-renthop.torrent
 .ipynb_checkpoints/Decision Tree-checkpoint.ipynb
 .ipynb_checkpoints/Preprocessing-checkpoint.ipynb
 .ipynb_checkpoints/sad_mining1-Copy1-checkpoint.ipynb
 sad_mining1.ipynb.orig
-Preprocessing.pyc
+*.pyc
 *.csv
+
