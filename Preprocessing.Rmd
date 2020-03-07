@@ -1,24 +1,15 @@
 ---
 jupyter:
   jupytext_formats: ipynb,Rmd:rmarkdown
-  jupytext:
-    text_representation:
-      extension: .Rmd
-      format_name: rmarkdown
-      format_version: '1.2'
-      jupytext_version: 1.3.3
-  kernelspec:
-    display_name: Python 3
-    language: python
-    name: python3
----
+
 
 # Phase 1: Exploratory data analysis and data pre-processing
 
 ### Taryn Chung, ZeYu Zhu, Kearro Chow
 
 ```{python}
-import numpy as np
+
+import numpy as np 
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -47,7 +38,8 @@ plt.show()
 ```
 
 ```{python}
-plt.pie(int_level.values,(0,0,0),int_level.index, autopct='%1.0f%%',
+
+plt.pie(int_level.values,(0,0,0),int_level.index, autopct='%1.0f%%', 
        shadow=False, startangle=0,   
        pctdistance=1.2,labeldistance=1.4)
 plt.axis('equal')
@@ -165,7 +157,8 @@ train_df.groupby('bathrooms').count();
 train_df.groupby('bathrooms').count().sum()
 ```
 
-Again, we found no missing values for bathrooms by the same technique as bedrooms. We found 313 places with with 0 bathrooms but this can be normal for places with a shared bathroom on a floor.
+
+Again, we found no missing values for bathrooms by the same technique as bedrooms. We found 313 places with with 0 bathrooms but this can be normal for places with a shared bathroom on a floor. 
 
 
 ### Building ID
@@ -439,6 +432,7 @@ for row in train_df['price']:
     else:
         whichrow += 1
 
+
 mean_val =round(nanmean(train_df['price']),2)
 
 whichrow = 0
@@ -495,6 +489,7 @@ for row in train_df['latitude']:
     else:
         whichrow += 1
 
+
 mean_val = nanmean(train_df['latitude'])
 #print(mean_val)
 whichrow = 0
@@ -549,6 +544,8 @@ for row in train_df['longitude']:
         whichrow+=1
     else:
         whichrow += 1
+
+        
 
 mean_val = nanmean(train_df['longitude'])
 print(mean_val)
@@ -643,7 +640,8 @@ No discernable way to identify outliers until we are able to extract these featu
 ## Text feature extraction
 
 
-Here we expore the text in two meaningful features of the listings: features and description. We use the TFIDF to tokenize the words found in each feature. Common stop words were excluded and we defined each word 2+ characters because there were some words found such as 'xx' and other random strings. Since the features are actually lists in this column, we concatenated them to string before tokenize. After tokenization, we vectorize each feature into new columns.
+Here we expore the text in two meaningful features of the listings: features and description. We use the TFIDF to tokenize the words found in each feature. Common stop words were excluded and we defined each word 2+ characters because there were some words found such as 'xx' and other random strings. Since the features are actually lists in this column, we concatenated them to string before tokenize. After tokenization, we vectorize each feature into new columns. 
+
 
 ```{python}
 # vectorize each description into a new column by frequency
@@ -668,6 +666,7 @@ vectorizer.fit(train_df['features'].values);
 train_df['feat_vect'] = train_df['features'].apply(lambda x: vectorizer.transform([x]))
 # vectorizer.vocabulary_  #shows all tokens
 ```
+
 
 ## Image feature extraction
 
@@ -728,13 +727,16 @@ temp = []
 for i in range (1,length):
     temp += ["img"+str(i)]
 
+
 tempdict = dict.fromkeys(temp, [])
 
 for i in range(1,length+1):
     tempdict["img"+str(i)] = patches_list[int(i)-1]
 
 
+
 # reconstruct from patches and show image
+
 tempf = im2_list[0]
 tempimg =image.reconstruct_from_patches_2d(patches_list[0],(426, 640, 3))
 np.testing.assert_array_equal(tempf,tempimg)
@@ -771,6 +773,7 @@ img_ravel.head(10)
 
 ```{python}
 import cv2
+
 
 color = ('r','g','b')
 for i,col in enumerate(color):
@@ -809,6 +812,7 @@ for image in im2_list:
     corners = np.int0(corners)
     top25_corners.append(corners)
     # print(corners)
+
 
 # print(top25_corners)
 

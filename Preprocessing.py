@@ -1,11 +1,14 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+
 # # Phase 1: Exploratory data analysis and data pre-processing
 #
 # ### Taryn Chung, ZeYu Zhu, Kearro Chow
 
+
 # In[ ]:
+
 
 
 import numpy as np
@@ -19,16 +22,17 @@ from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 color = sns.color_palette()
 
 
-# In[ ]:
-
 
 train_df = pd.read_json("train.json")
 #train_df
 
 
+
 # ## Hour-wise listing trend
 
+
 # In[ ]:
+
 
 
 train_df["created"] = pd.to_datetime(train_df["created"])
@@ -40,7 +44,7 @@ train_df["hour_created"] = train_df["created"].dt.hour
 # ### Created
 
 
-# In[ ]:
+
 
 
 whichrow = 0
@@ -59,7 +63,7 @@ for row in train_df['display_address']:
 
 # ### Street Address
 
-# In[ ]:
+
 
 
 whichrow = 0
@@ -78,7 +82,6 @@ for row in train_df['street_address']:
 
 # ### Latitude
 
-# In[ ]:
 
 
 whichrow = 0
@@ -93,7 +96,6 @@ for row in train_df['latitude']:
 
 # ### Longitude
 
-# In[ ]:
 
 
 whichrow = 0
@@ -115,7 +117,7 @@ train_df = train_df.dropna()
 #
 # ### Prices
 
-# In[ ]:
+
 
 
 q25, q75 = np.percentile(train_df['price'].values, 25), np.percentile(train_df['price'].values, 75)
@@ -129,7 +131,7 @@ outliers = [x for x in train_df['price'].values if x > upper or x < lower]
 
 # #### After Handling
 
-# In[ ]:
+
 
 whichrow = 0
 for row in train_df['price']:
@@ -156,7 +158,7 @@ for row in train_df['price']:
 
 # #### Before Handling
 
-# In[ ]:
+
 
 
 q25, q75 = np.percentile(train_df['latitude'].values, 25), np.percentile(train_df['latitude'].values, 75)
@@ -170,7 +172,7 @@ outliers = [x for x in train_df['latitude'].values if x > upper or x < lower]
 
 # #### After Handling
 
-# In[ ]:
+
 
 
 whichrow = 0
@@ -197,7 +199,7 @@ for row in train_df['latitude']:
 
 # ### Longitude
 
-# In[ ]:
+
 
 
 q25, q75 = np.percentile(train_df['longitude'].values, 25), np.percentile(train_df['longitude'].values, 75)
@@ -211,7 +213,7 @@ outliers = [x for x in train_df['longitude'].values if x > upper or x < lower]
 
 # #### After Handling
 
-# In[ ]:
+
 
 
 whichrow = 0
@@ -243,7 +245,6 @@ for row in train_df['longitude']:
 
 # Here we expore the text in two meaningful features of the listings: features and description. We use the TFIDF to tokenize the words found in each feature. Common stop words were excluded and we defined each word 2+ characters because there were some words found such as 'xx' and other random strings. Since the features are actually lists in this column, we concatenated them to string before tokenize. After tokenization, we vectorize each feature into new columns.
 
-# In[ ]:
 
 
 # vectorize each description into a new column by frequency
@@ -256,14 +257,13 @@ train_df['desc_vect'] = train_df['description'].apply(lambda x: vectorizer.trans
 #vectorizer.vocabulary_  #shows all tokens
 
 
-# In[ ]:
 
 
 # convert features list to string
 train_df['features'] = train_df['features'].apply(lambda x: ' '.join(x))
 
 
-# In[ ]:
+
 
 
 #features
