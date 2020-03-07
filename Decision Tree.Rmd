@@ -180,7 +180,7 @@ From the Fisher scores, it looks like the building, address, and manager have th
 
 ## First Version
 
-The classifier doesn't accept the extracted text features from the previous milestone so for the first classifier they were removed and the classifier was trained for the numerical data only. The 3 features with the highest fisher scores are selected for the first classifier. These are building, address, and manager. The default Gini index was used to determine the best split for each node. The classifier predicted with average 62.73% accuracy. You can see the classifier is biased and has higher precision, recall, and f1 scores for the low interest class. More than triple the high interest. It also overfits to the training data because the accuracy for the test dataset is almost 20% higher.
+The classifier doesn't accept the extracted text features from the previous milestone so for the first classifier they were removed and the classifier was trained for the numerical data only. The 3 features with the highest fisher scores are selected for the first classifier. These are building, address, and manager. The default Gini index was used to determine the best split for each node. The classifier predicted with average 62.33% accuracy. You can see the classifier is biased and has higher precision, recall, and f1 scores for the low interest class. More than triple the high interest.
 
 ```{python}
 # perform cross-validation for first set of classifiers
@@ -238,7 +238,7 @@ np.savetxt('test_v1.csv',test_prob, delimiter=',',header='listing_id,high,medium
 
 ## Second Version
 
-Top 5 features according to Fisher scores were used for this classifier. Gini index was used to determine the best split for each node. The classifier predicted with the same average accuracy (63.32%) as the first version.
+Top 5 features according to Fisher scores were used for this classifier. Gini index was used to determine the best split for each node. The classifier predicted with the same average accuracy (62.49%) as the first version.
 
 ```{python}
 # perform cross-validation for first set of classifiers
@@ -279,7 +279,7 @@ acc
 
 ## Third Version
 
-All numeric features were used for this classifier. The default Gini index was used to determine the best split for each node like before. The classifier predicted with average 65.66% accuracy. It looks like the classifier has slightly better accuracy with all features.
+All numeric features were used for this classifier. The default Gini index was used to determine the best split for each node like before. The classifier predicted with average 64.72% accuracy. It looks like the classifier has slightly better accuracy with all features.
 
 ```{python}
 # perform cross-validation for first set of classifiers
@@ -340,7 +340,7 @@ prob_l = int_level[2]/float(int_all)
 print(prob_h, prob_m, prob_l)
 ```
 
-Since the distribution of our target is skewed, we should stratify our data when spliting so it represents our data well. All numeric features were used for this classifier. Gini index was used to determine the best split for each node. A stratified k-fold cross validation method was used. The classifier predicted with average 65.74% accuracy, which is ever so slightly better than regular k-fold cross validation.
+Since the distribution of our target is skewed, we should stratify our data when spliting so it represents our data well. All numeric features were used for this classifier. Gini index was used to determine the best split for each node. A stratified k-fold cross validation method was used. The classifier predicted with average 65.02% accuracy, which is ever so slightly better than regular k-fold cross validation.
 
 ```{python}
 # perform cross-validation for first set of classifiers
@@ -381,7 +381,7 @@ acc
 
 ## Fifth Version
 
-All numeric features were used for this classifier. Entropy was used to determine the best split for each node. A stratified k-fold cross validation method was used. The classifier predicted with average 65.62% accuracy, which is ever so slightly worse than using gini index to find the best split.
+All numeric features were used for this classifier. Entropy was used to determine the best split for each node. A stratified k-fold cross validation method was used. The classifier predicted with average 65.41% accuracy, which is ever so slightly worse than using gini index to find the best split.
 
 ```{python}
 # perform cross-validation for first set of classifiers
@@ -423,7 +423,7 @@ acc
 
 ## Sixth Version
 
-All numeric features were used for this classifier. Gini index was used to determine the best split for each node since it performed slightly better. A stratified k-fold cross validation method was used. Minimum support was changed to 3 to combat overfitting. The classifier predicted with average 66.46% accuracy.
+All numeric features were used for this classifier. Gini index was used to determine the best split for each node since it performed slightly better. A stratified k-fold cross validation method was used. Minimum support was changed to 3 to combat overfitting. The classifier predicted with average 65.49% accuracy.
 
 ```{python}
 # perform cross-validation for first set of classifiers
@@ -536,7 +536,7 @@ acc
 
 ## Eighth Version
 
-All numeric features and the features were used for this classifier. Gini index seemed to do slightly better so it was used to determine the best split for each node. A stratified k-fold cross validation method was used. Minimum support was changed to 100 and the classifier predicted with average 69.55% accuracy, which is a large improvement. Recall the low interest class was at an all time high with 1.00. The classifier doesn't seem to be predicting the medium or high interest classes corectly at all. There seems to be no overfitting since the performance on the test dataset is only off by 0.01%.
+All numeric features and the features were used for this classifier. Gini index seemed to do slightly better so it was used to determine the best split for each node. A stratified k-fold cross validation method was used. Minimum support was changed to 100 and the classifier predicted with average 71.13% accuracy, which is a large improvement. Recall the low interest class was at an all time high with 1.00. The classifier doesn't seem to be predicting the medium or high interest classes corectly at all. There seems to be no overfitting since the performance on the test dataset is only off by less than 1%.
 
 ```{python}
 # perform cross-validation for first set of classifiers
@@ -577,7 +577,7 @@ acc
 
 ## Ninth Version
 
-Here we're trying a Random Forest to try and combat inconsistent data creating very different trees. Playing with the parameters, number of folds, and features also gets the same results, on average, as before. Although we do get one classifier that performs the best with an accuracy of 70.81%. This classifier will be used for testing.
+Here we're trying a Random Forest to try and combat inconsistent data creating very different trees. Playing with the parameters, number of folds, and features also gets the same results, on average, as before. Although we do get one classifier that performs the best with an accuracy of 69.92%. This classifier will be used for testing.
 
 ```{python}
 # perform cross-validation for first set of classifiers
@@ -617,7 +617,7 @@ acc
 
 ## Tenth Version
 
-Here we're trying a Random Forest to try and combat inconsistent data creating very different trees. Playing with the parameters, number of folds, and features also gets the same results, on average, as before. Although we do get one classifier that performs the best with an accuracy of 70.81%. This classifier will be used for testing.
+Here we're trying a Random Forest to try and combat inconsistent data creating very different trees. Playing with the parameters, number of folds, and features also gets the same results, on average, as before. Although we do get one classifier that performs the best with an accuracy of 72.55%. This classifier will be used for testing.
 
 ```{python}
 # perform cross-validation for first set of classifiers
@@ -628,7 +628,7 @@ for train_index, valid_index in kf.split(X2, y_tr):
     X_train, X_valid = X2.iloc[train_index], X2.iloc[valid_index]
     y_train, y_valid = y_tr.iloc[train_index], y_tr.iloc[valid_index]
     # Create classifier object
-    clf = RandomForestClassifier(criterion="gini", random_state=0,min_samples_leaf=20,n_estimators=50,min_samples_split=100)
+    clf = RandomForestClassifier(criterion="gini", random_state=0,min_samples_leaf=20,n_estimators=50)
     # Train Decision Tree Classifer
     clf = clf.fit(np.array(X_train[numeric]),np.array(y_train))
     #Predict the response for test dataset
@@ -657,51 +657,15 @@ acc
 
 # 4. Predictions on  test dataset
 
-Score (multiclass log-loss) = 0.79164 using a Random Forest classifier, the eighth version of classifiers. The benchmark of sample submission is 0.78598 so our classifier isn’t that far off. 
+Score (multiclass log-loss) = 0.65105 using a Random Forest classifier, the eighth version of classifiers. The benchmark of sample submission is 0.78598 so our classifier isn’t that far off. 
 
 - Decision-tree learners can create over-complex trees that do not generalise the data well. This is called overfitting. Mechanisms such as pruning (not currently supported), setting the minimum number of samples required at a leaf node or setting the maximum depth of the tree are necessary to avoid this problem.
 
 - Decision trees can be unstable because small variations in the data might result in a completely different tree being generated. This problem is mitigated by using decision trees within an ensemble.
 
-## Add hot encoded text feature to test
-
-```{python}
-# convert features list to string
-test['features'] = test['features'].apply(lambda x: ' '.join(x))
-```
-
-```{python}
-# extract features using tfidf
-vectorizer = TfidfVectorizer(analyzer='word', stop_words='english', token_pattern=r'^[a-zA-Z][a-zA-Z]+',max_features=79)
-vectorizer.fit(test['features'].values);
-test['feat_vect'] = test['features'].apply(lambda x: vectorizer.transform([x]))
-```
-
-```{python}
-# convert features vectors to list
-feat = test['feat_vect'].apply(lambda x: x.toarray().tolist())
-feat_list = []
-for i in feat:
-    feat_list.append(i)
-```
-
-```{python}
-# create dataframe of hot encoded feature vector
-test2 = pd.DataFrame(np.array(feat_list).reshape(np.array(feat_list).shape[0],np.array(feat_list).shape[2]))
-```
-
-```{python}
-# join hot encoded features to test dataset
-test = test.join(test2)
-```
-
-```{python}
-test.drop(['feat_vect'], axis=1, inplace=True)
-```
-
 ```{python}
 # use best classifier on test dataset
-y_pred = best_clf.predict_proba(test.drop(['listing_id'],axis=1))
+y_pred = best_clf.predict_proba(test[numeric])
 ```
 
 ```{python}
