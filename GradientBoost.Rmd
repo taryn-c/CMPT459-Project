@@ -23,6 +23,7 @@ from sklearn.metrics import accuracy_score, confusion_matrix, classification_rep
 from sklearn.feature_extraction.text import TfidfVectorizer,CountVectorizer;
 from pandas.api.types import CategoricalDtype
 from sklearn.metrics import log_loss;
+from xgboost import XGBClassifier
 plt.style.use('ggplot')
 ```
 
@@ -82,10 +83,6 @@ test2['feat_vect'] = test2['features'].apply(lambda x: vectorizer.transform([x])
 ```
 
 ```{python}
-test2
-```
-
-```{python}
 test2.drop(['features'], axis=1, inplace=True)
 ```
 
@@ -95,10 +92,6 @@ Since the listing_id is unique to each lising, it really isn't relevant for our 
 
 ```{python}
 data.drop(['photos','listing_id','street_address','features','description','created'], axis=1, inplace=True)
-```
-
-```{python}
-data
 ```
 
 ## Binarize data by label encoding
@@ -632,6 +625,26 @@ print(classification_report(y_test, y_pred, target_names=['high', 'medium','low'
 
 ```{python}
 testing(model_gbc,test2,15)
+```
+
+## Version 16
+
+Using the default XGBoost we get slightly better performance.
+
+```{python}
+kf = StratifiedKFold(n_splits=10, random_state=0)
+model_gbc = XGBClassifier()
+train(kf,X2,X_test2,500,DEPTH,40,0.05);
+model_gbc = model_gbc.fit(np.array(X2),np.array(y_tr))
+y_prob = model_gbc.predict_proba(np.array(X_test2))
+y_pred = model_gbc.predict(np.array(X_test2))
+loss = log_loss(y_test, y_prob)
+#acc = accuracy_score(y_test, y_pred)
+results_gbc = cross_val_score(model_gbc, X2, y_tr, cv=kf, scoring='neg_log_loss')
+```
+
+```{python}
+testing(model_gbc,np.array(test2),16)
 ```
 
 # 4. Predictions on  test dataset
