@@ -1,0 +1,654 @@
+---
+jupyter:
+  jupytext:
+    text_representation:
+      extension: .Rmd
+      format_name: rmarkdown
+      format_version: '1.2'
+      jupytext_version: 1.3.3
+  kernelspec:
+    display_name: Python 3
+    language: python
+    name: python3
+---
+
+# Phase 3: Gradient Boost Classifier
+
+```{python}
+from Preprocessing import *;
+from sklearn.model_selection import StratifiedKFold,KFold,train_test_split,cross_val_score;
+from sklearn.preprocessing import LabelEncoder, OneHotEncoder, MinMaxScaler;
+from sklearn.ensemble import GradientBoostingClassifier as GBC;
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report;
+from sklearn.feature_extraction.text import TfidfVectorizer,CountVectorizer;
+from pandas.api.types import CategoricalDtype
+from sklearn.metrics import log_loss;
+plt.style.use('ggplot')
+```
+
+```{python}
+data = train_df.reset_index(drop=True)
+```
+
+## Processing test dataset
+
+```{python}
+test = pd.read_json("test.json")
+test = test.reset_index(drop=True)
+```
+
+```{python}
+# convert column to datetime
+test["created"] = pd.to_datetime(test["created"])
+# add hour created column
+test["hour_created"] = test["created"].dt.hour
+```
+
+```{python}
+# label encode
+test["address"] = test["display_address"].astype('category')
+test["address"] = test["address"].cat.codes
+test["manager_id"] = test["manager_id"].astype('category')
+test["manager"] = test["manager_id"].cat.codes
+test.drop(['manager_id'], axis=1, inplace=True)
+test["building_id"] = test["building_id"].astype('category')
+test["building"] = test["building_id"].cat.codes
+test.drop(['building_id'], axis=1, inplace=True)
+```
+
+```{python}
+# keep features
+test2 = test.drop(['photos','street_address','description','created','display_address'], axis=1)
+```
+
+```{python}
+# convert features list to string
+test2['features'] = test2['features'].apply(lambda x: ' '.join(x))
+```
+
+```{python}
+# keep features and description for hot encoding
+test3 = test.drop(['photos','street_address','created','display_address'], axis=1)
+```
+
+```{python}
+test.drop(['photos','street_address','features','description','created','display_address'], axis=1, inplace=True)
+```
+
+```{python}
+vectorizer = TfidfVectorizer(analyzer='word', stop_words='english', token_pattern=r'^[a-zA-Z][a-zA-Z][a-zA-Z]+', max_features=79)
+vectorizer.fit(test2['features'].values);
+test2['feat_vect'] = test2['features'].apply(lambda x: vectorizer.transform([x]))
+```
+
+```{python}
+test2
+```
+
+```{python}
+test2.drop(['features'], axis=1, inplace=True)
+```
+
+# 1. Feature Selection
+
+Since the listing_id is unique to each lising, it really isn't relevant for our model and will be removed. We will also remove the photos column because we won't be using this in our model either. We will also remove street_address because we can use the display_address as a categorical value since this is just the general street that the listing is on. This helps identify the general neighbourhood the listing is in for the buyer. The description, created, and features columns are removed because these are represented by newly extracted feature columns from the previous milestone.
+
+```{python}
+data.drop(['photos','listing_id','street_address','features','description','created'], axis=1, inplace=True)
+```
+
+```{python}
+data
+```
+
+## Binarize data by label encoding
+
+```{python}
+cat_type = CategoricalDtype(categories=["high", "medium", "low"],ordered=True)
+cat_type
+```
+
+```{python}
+# high-0, medium-1, low-2
+data["interest_level"] = data["interest_level"].astype(cat_type)
+data["target"] = data["interest_level"].cat.codes
+data.drop(['interest_level'], axis=1, inplace=True)
+```
+
+```{python}
+data["address"] = data["display_address"].astype('category')
+data["address"] = data["address"].cat.codes
+data.drop(['display_address'], axis=1, inplace=True)
+```
+
+```{python}
+data["building_id"] = data["building_id"].astype('category')
+data["building"] = data["building_id"].cat.codes
+data.drop(['building_id'], axis=1, inplace=True)
+```
+
+```{python}
+data["manager_id"] = data["manager_id"].astype('category')
+data["manager"] = data["manager_id"].cat.codes
+data.drop(['manager_id'], axis=1, inplace=True)
+```
+
+## Split the data
+
+I will split our input and target variables into X and y respectively. We will also split into training and test data so we can see if our models are overfitting the data.
+
+```{python}
+X = data.drop(['target'], axis=1)
+y = data['target']
+X_tr, X_test, y_tr, y_test = train_test_split(X,y)
+```
+
+```{python}
+X_test.reset_index(inplace=True,drop=True)
+X_tr.reset_index(inplace=True,drop=True)
+```
+
+## Fisher score
+
+Since this is only valid for numerica features, we must first take a subset of our data. We will separate the data based on interest level to calculate the mean and standard deviation of each class. These values will be used to calculate the fisher score for each feature. We can then use a filtering technique to find the most relevant features based on the scores. 
+
+```{python}
+# take subset
+numeric = ['bathrooms','bedrooms','latitude','longitude','price','hour_created','address','manager','building']
+all_feats = ['bathrooms','bedrooms','latitude','longitude','price','hour_created','address','manager','building','desc_vect','feat_vect']
+num_data = data[['bathrooms','bedrooms','latitude','longitude','price','hour_created','address','manager','building','target']]
+```
+
+```{python}
+# separate data by interest level
+high = num_data[num_data['target'] == 2].drop(['target'], axis=1)
+med = num_data[num_data['target'] == 1].drop(['target'], axis=1)
+low = num_data[num_data['target'] == 0].drop(['target'], axis=1)
+```
+
+```{python}
+# calculate mean of each feature in each class
+avg_if = np.array([high.mean(),
+      med.mean(),
+      low.mean()])
+#calculate mean of each feature
+avg_f = np.array(num_data.drop(['target'], axis=1).mean())
+```
+
+```{python}
+# calculate variance for each feature
+var = np.square(np.array([high.std(),
+      med.std(),
+      low.std()]))
+
+# calculate probability of each class
+prob = np.array([high.shape[0]/float(data.shape[0]),
+             med.shape[0]/float(data.shape[0]),
+             low.shape[0]/float(data.shape[0])]
+)
+```
+
+```{python}
+fisher = []
+numerator = []
+denomerator = []
+
+for feat in np.arange(0,avg_if.shape[1]):
+    for class_i in np.arange(0,avg_if.shape[0]):
+        numerator.append(np.array(prob[class_i]*np.square(avg_if[class_i][feat]-avg_f[feat])))
+        denomerator.append(np.array(prob[class_i]*var[class_i]))      
+    fisher.append(np.array(numerator).sum()/np.array(denomerator).sum())
+fisher
+```
+
+```{python}
+top3 = ['building', 'manager', 'address']
+top5 = ['building', 'manager', 'address','price', 'hour_created']
+```
+
+From the Fisher scores, it looks like the building, address, and manager have the top 3 fisher scores, in that order.  Price and hour the listing was created also have decent fisher scores. The worst was longitude and the rest weren't that far off either with 10 significant digits. 
+
+
+# 2. Train Classifiers
+
+## Helper Functions
+
+```{python}
+# set default hyperparameters
+N_EST = 100
+DEPTH = 3
+RATE = 0.1
+MIN_SAMP = 1
+```
+
+```{python}
+global listing_id;
+listing_id = test['listing_id'].values
+listing_id = listing_id.reshape(listing_id.shape[0],1)
+```
+
+```{python}
+def train(kf,train_df,test_df,n_est,depth,min_leaf,rate):
+    model_gbc = GBC(n_estimators=n_est, random_state=0,max_depth=depth,min_samples_leaf=min_leaf, learning_rate=rate)
+    model_gbc = model_gbc.fit(np.array(train_df),np.array(y_tr))
+    y_prob = model_gbc.predict_proba(test_df)
+    y_pred = model_gbc.predict(test_df)
+    loss = log_loss(y_test, y_prob)
+    #acc = accuracy_score(y_test, y_pred)
+    results_gbc = cross_val_score(model_gbc, train_df, y_tr, cv=kf, scoring='neg_log_loss')
+    print_results(results_gbc,loss)
+    return y_prob, y_pred, model_gbc
+
+def print_results(results_gbc, loss):
+    print('Cross validation results:\n'
+          'Negative log loss of folds: {0}\n'
+          'Mean log loss of all folds: {1} (+/-{2})\n'
+          'Test log loss: {3}'.format(results_gbc,results_gbc.mean(),results_gbc.std(),loss))
+
+def testing(model_gbc, test_df,version):
+    # use best classifier on test dataset
+    y_pred = model_gbc.predict_proba(test_df)
+    # Test output for log loss
+    test_prob = np.concatenate((listing_id,y_pred),axis=1)
+    np.savetxt('test_v{}.csv'.format(version),test_prob, delimiter=',',header='listing_id,high,medium,low',encoding='ascii')
+```
+
+## First Version
+
+The first version used all numeric features. Regular cross validation with 5 folds was used. Number of estimators was 100. Kaggle score: 0.65793. 
+
+```{python}
+# second time
+kf = KFold(n_splits=5, random_state=0)
+(y_prob, y_pred, model_gbc) = train(kf,100,numeric)
+```
+
+```{python}
+# first time somehow?!
+```
+
+```{python}
+print(classification_report(y_test, y_pred, target_names=['high', 'medium','low']))
+```
+
+```{python}
+#testing(model_gbc,numeric,1)
+```
+
+## Second Version
+
+Top 5 features according to Fisher scores were used for this classifier. This version did worse than the first in both training and test data. Precesion for all classes was also lower. 
+
+```{python}
+kf = KFold(n_splits=5, random_state=0)
+(y_prob, y_pred, model_gbc) = train(kf,100,top5)
+```
+
+```{python}
+print(classification_report(y_test, y_pred, target_names=['high', 'medium','low']))
+```
+
+```{python}
+testing(model_gbc,top5,2)
+```
+
+## Third Version
+
+All numeric features were used for this classifier. 10 folds were used. Testing log loss (0.71) was actually higher than validation (mean -0.634304785285 (+/-0.0115601003865)).
+
+```{python}
+kf = KFold(n_splits=10, random_state=0) #random state was 10 for output
+(y_prob, y_pred, model_gbc) = train(kf,100,numeric)
+```
+
+```{python}
+print(classification_report(y_test, y_pred, target_names=['high', 'medium','low']))
+```
+
+```{python}
+testing(model_gbc,numeric,3)
+```
+
+## Fourth Version
+
+We can check the distribution of the target to see if stratifying the samples will help us identify any under-represented classes.
+
+```{python}
+int_level = train_df['interest_level'].value_counts()
+plt.figure(figsize=(15,6))
+sns.barplot(int_level.index, int_level.values, alpha=1, order=['low','medium','high'],color=color[0])
+plt.ylabel('Number of Occurrences', fontsize=14, fontweight='bold')
+plt.xlabel('Interest level', fontsize=14, fontweight='bold')
+plt.title('Target distribution', fontsize=16, fontweight='bold')
+plt.show()
+```
+
+```{python}
+int_all = int_level.sum()
+prob_h = int_level[0]/float(int_all)
+prob_m = int_level[1]/float(int_all)
+prob_l = int_level[2]/float(int_all)
+print(prob_h, prob_m, prob_l)
+```
+
+Since the distribution of our target is skewed, we should stratify our data when spliting so it represents our data well. All numeric features were used for this classifier. A stratified k-fold cross validation method was used. The classifier predicted with average 71.59, which is the same as regular k-fold cross validation.
+
+```{python}
+kf = StratifiedKFold(n_splits=10, random_state=0)
+(y_prob, y_pred, model_gbc) = train(kf,100,numeric)
+```
+
+```{python}
+print(classification_report(y_test, y_pred, target_names=['high', 'medium','low']))
+```
+
+```{python}
+testing(model_gbc,numeric,4)
+```
+
+## Fifth Version
+
+All numeric features were used for this classifier. Number of estimators was increased to 150. A stratified k-fold cross validation method was used. The classifier predicted with average 62.63% log loss. OVerfitting is occuring.
+
+```{python}
+kf = StratifiedKFold(n_splits=10, random_state=0)
+(y_prob, y_pred, model_gbc) = train(kf,150,numeric)
+```
+
+```{python}
+print(classification_report(y_test, y_pred, target_names=['high', 'medium','low']))
+```
+
+```{python}
+testing(model_gbc,numeric,5)
+```
+
+## Sixth Version
+
+All numeric features were used for this classifier. Number of estimators was increased to 200. A stratified k-fold cross validation method was used. The classifier predicted with average 62.63% log loss on validation. Since boosting selects the best features for the next stage, its better to start with more features. Overfitting is occurring since our test log loss is higher than validation. 
+
+```{python}
+kf = StratifiedKFold(n_splits=10, random_state=0)
+(y_prob, y_pred, model_gbc) = train(kf,200,numeric)
+```
+
+```{python}
+print(classification_report(y_test, y_pred, target_names=['high', 'medium','low']))
+```
+
+```{python}
+testing(model_gbc,numeric,5)
+```
+
+## Seventh Version
+
+Minimum samples per leaf = 20, 200 estimators, numeric features
+
+```{python}
+kf = StratifiedKFold(n_splits=10, random_state=0)
+model_gbc = GBC(n_estimators=200, random_state=0,min_samples_leaf=20)
+model_gbc = model_gbc.fit(np.array(X_tr[numeric]),np.array(y_tr))
+y_pred = model_gbc.predict(X_test[numeric])
+y_prob = model_gbc.predict_proba(X_test[numeric])
+loss = log_loss(y_test, test_prob)
+results_gbc = cross_val_score(model_gbc, X_tr[numeric], y_tr, cv=kf, scoring='neg_log_loss')
+print_results(results_gbc,loss)
+```
+
+```{python}
+print(classification_report(y_test, y_pred, target_names=['high', 'medium','low']))
+```
+
+## Eigth Version
+
+K fold with 5 folds, 50 estimators.
+
+```{python}
+kf = KFold(n_splits=5, random_state=0)
+(y_prob, y_pred, model_gbc) = train(kf,50,numeric)
+```
+
+```{python}
+print(classification_report(y_test, y_pred, target_names=['high', 'medium','low']))
+```
+
+```{python}
+testing(model_gbc,numeric,8)
+```
+
+## Ninth Version
+
+Minimum samples per leaf = 20, 250 estimators, numeric features
+
+```{python}
+kf = StratifiedKFold(n_splits=10, random_state=0)
+model_gbc = GBC(n_estimators=250, random_state=0,min_samples_leaf=20)
+model_gbc = model_gbc.fit(np.array(X_tr[numeric]),np.array(y_tr))
+y_pred = model_gbc.predict(X_test[numeric])
+y_prob = model_gbc.predict_proba(X_test[numeric])
+loss = log_loss(y_test, y_prob)
+results_gbc = cross_val_score(model_gbc, X_tr[numeric], y_tr, cv=kf, scoring='neg_log_loss')
+print_results(results_gbc,loss)
+```
+
+```{python}
+print(classification_report(y_test, y_pred, target_names=['high', 'medium','low']))
+```
+
+```{python}
+testing(model_gbc,numeric,9)
+```
+
+## Tenth Version
+
+Minimum samples per leaf = 40, 250 estimators, numeric features. Kaggle score 0.64874.
+
+```{python}
+kf = StratifiedKFold(n_splits=10, random_state=0)
+model_gbc = GBC(n_estimators=250, random_state=0,min_samples_leaf=40)
+model_gbc = model_gbc.fit(np.array(X_tr[numeric]),np.array(y_tr))
+y_pred = model_gbc.predict(X_test[numeric])
+y_prob = model_gbc.predict_proba(X_test[numeric])
+loss = log_loss(y_test, y_prob)
+results_gbc = cross_val_score(model_gbc, X_tr[numeric], y_tr, cv=kf, scoring='neg_log_loss')
+print_results(results_gbc,loss)
+```
+
+```{python}
+print(classification_report(y_test, y_pred, target_names=['high', 'medium','low']))
+```
+
+```{python}
+testing(model_gbc,numeric,10)
+```
+
+## Eleventh Version
+
+Minimum samples per leaf = 40, 250 estimators, numeric features. large max depth leads to poor variance.
+
+```{python}
+kf = StratifiedKFold(n_splits=10, random_state=0)
+model_gbc = GBC(n_estimators=250, random_state=0,min_samples_leaf=40, max_depth=100)
+model_gbc = model_gbc.fit(np.array(X_tr[numeric]),np.array(y_tr))
+y_pred = model_gbc.predict(X_test[numeric])
+y_prob = model_gbc.predict_proba(X_test[numeric])
+loss = log_loss(y_test, y_prob)
+results_gbc = cross_val_score(model_gbc, X_tr[numeric], y_tr, cv=kf, scoring='neg_log_loss')
+print_results(results_gbc,loss)
+```
+
+```{python}
+print(classification_report(y_test, y_pred, target_names=['high', 'medium','low']))
+```
+
+```{python}
+testing(model_gbc,numeric,11)
+```
+
+## Twelfth Version
+
+We can introduce our extracted text features for this version. Number of estimators = 250, Min samples per leaf = 40
+
+
+### Hot encode features vector
+
+The Decision Tree classifier in the sklearn sorts each feature to split the data and doesn't support features that are vectors. So to use any text features we must hot encode them. However, the description vectors are 1119 long so we will only do the features. Looking at the two text features, it seems like description might not be that helpful because there are a lot of irrelevant words/strings in most of them like 'XXX'. 
+
+```{python}
+# training
+feat = X_tr['feat_vect'].apply(lambda x: x.toarray().tolist())
+feat_list = []
+for i in feat:
+    feat_list.append(i)
+```
+
+```{python}
+X2 = pd.DataFrame(np.array(feat_list).reshape(np.array(feat_list).shape[0],np.array(feat_list).shape[2]))
+X2 = X_tr[numeric].join(X2)
+```
+
+```{python}
+# test dataset (all rows)
+feat = test2['feat_vect'].apply(lambda x: x.toarray().tolist())
+feat_list = []
+for i in feat:
+    feat_list.append(i)
+```
+
+```{python}
+test2 = pd.DataFrame(np.array(feat_list).reshape(np.array(feat_list).shape[0],np.array(feat_list).shape[2]))
+test2 = test[numeric].join(test2)
+```
+
+```{python}
+# X_test dataset for testing validation (subset)
+feat = X_test['feat_vect'].apply(lambda x: x.toarray().tolist())
+feat_list = []
+for i in feat:
+    feat_list.append(i)
+```
+
+```{python}
+X_test2 = pd.DataFrame(np.array(feat_list).reshape(np.array(feat_list).shape[0],np.array(feat_list).shape[2]))
+X_test2 = X_test[numeric].join(X_test2)
+```
+
+All numeric features and the hot encoded features were used for this classifier.  A stratified k-fold cross validation method was used. Using the features vectors has slight improvements to the model in terms of log loss although the f1-scores are slightly worse. Kaggle score 0.64194 which is the best so far.
+
+```{python}
+kf = StratifiedKFold(n_splits=10, random_state=0)
+model_gbc = GBC(n_estimators=250, random_state=0,min_samples_leaf=40)
+model_gbc = model_gbc.fit(np.array(X2),np.array(y_tr))
+y_pred = model_gbc.predict(X_test2)
+y_prob = model_gbc.predict_proba(X_test2)
+loss = log_loss(y_test, y_prob)
+results_gbc = cross_val_score(model_gbc, X2, y_tr, cv=kf, scoring='neg_log_loss')
+print_results(results_gbc,loss)
+```
+
+```{python}
+print(classification_report(y_test, y_pred, target_names=['high', 'medium','low']))
+```
+
+```{python}
+# output csv probabilities for kaggle
+y_pred = model_gbc.predict_proba(test2)
+# Test output for log loss
+test_prob = np.concatenate((listing_id,y_pred),axis=1)
+np.savetxt('test_v{}.csv'.format(12),test_prob, delimiter=',',header='listing_id,high,medium,low')
+```
+
+## Thirteenth Version
+
+Minimum samples per leaf = 40, 250 estimators, numeric features. We can decrease the learning rate in this version. Since trees are added sequentially, we can reduce the impact of them so that it leaves more room for future trees to improve the model. There is a tradeoff with learning rate and number of trees. So this model is a lot slower than previous ones.
+
+```{python}
+kf = StratifiedKFold(n_splits=10, random_state=0)
+model_gbc = GBC(n_estimators=400, random_state=0,min_samples_leaf=40, learning_rate=0.05)
+model_gbc = model_gbc.fit(np.array(X2),np.array(y_tr))
+y_pred = model_gbc.predict(X_test2)
+y_prob = model_gbc.predict_proba(X_test2)
+loss = log_loss(y_test, y_prob)
+results_gbc = cross_val_score(model_gbc, X2, y_tr, cv=kf, scoring='neg_log_loss')
+print_results(results_gbc,loss)
+```
+
+```{python}
+print(classification_report(y_test, y_pred, target_names=['high', 'medium','low']))
+```
+
+```{python}
+testing(model_gbc,test2,13)
+```
+
+## Fourteenth Version
+
+Minimum samples per leaf = 40, 250 estimators, numeric + features. 
+
+Changing max depth to 2 makes the model slightly worse.
+
+```{python}
+kf = StratifiedKFold(n_splits=10, random_state=0)
+(y_prob, y_pred, model_gbc) = train(kf,X2,X_test2,250,2,40,RATE)
+```
+
+```{python}
+print(classification_report(y_test, y_pred, target_names=['high', 'medium','low']))
+```
+
+```{python}
+testing(model_gbc,test2,14)
+```
+
+## Fifteenth Version
+
+Minimum samples per leaf = 40, 250 estimators, numeric + features. 
+
+Changing max depth to 2 makes the model slightly worse. Tried to minimize this effect by adding more estimators but it didn't help.
+
+```{python}
+kf = StratifiedKFold(n_splits=10, random_state=0)
+(y_prob, y_pred, model_gbc) = train(kf,X2,X_test2,500,2,40,0.05)
+```
+
+```{python}
+print(classification_report(y_test, y_pred, target_names=['high', 'medium','low']))
+```
+
+## Fifteenth Version
+
+Minimum samples per leaf = 40, 250 estimators, numeric + features. 
+
+Changing max depth to 2 makes the model slightly worse. Tried to minimize this effect by adding more estimators but it didn't help.
+
+```{python}
+kf = StratifiedKFold(n_splits=10, random_state=0)
+train(kf,X2,X_test2,500,DEPTH,40,0.05);
+```
+
+```{python}
+print(classification_report(y_test, y_pred, target_names=['high', 'medium','low']))
+```
+
+```{python}
+testing(model_gbc,test2,15)
+```
+
+# 4. Predictions on  test dataset
+
+Score (multiclass log-loss) = 0.65105 using a Random Forest classifier, the eighth version of classifiers. The benchmark of sample submission is 0.78598 so our classifier isn’t that far off. 
+
+- Decision-tree learners can create over-complex trees that do not generalise the data well. This is called overfitting. Mechanisms such as pruning (not currently supported), setting the minimum number of samples required at a leaf node or setting the maximum depth of the tree are necessary to avoid this problem.
+
+- Decision trees can be unstable because small variations in the data might result in a completely different tree being generated. This problem is mitigated by using decision trees within an ensemble.
+
+```{python}
+# use best classifier on test dataset
+y_pred = best_clf.predict_proba(test[numeric])
+```
+
+```{python}
+# Test output for log loss
+test_prob = np.concatenate((listing_id,y_pred),axis=1)
+np.savetxt('test_best.csv',test_prob, delimiter=',',header='listing_id,high,medium,low')
+```
