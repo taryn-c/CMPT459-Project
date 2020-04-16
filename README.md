@@ -12,15 +12,19 @@ Data is obtained from Kaggle: https://www.kaggle.com/c/two-sigma-connect-rental-
   - `NumPy`
   - `matplotlib`
   - `seaborn`
-  - `re`
 
 ### Classifiers:
 
-  - Decision Trees and Random Forest: DecisionTree.ipynb (tarync)
-  - Gradient Boosting with Decision Trees: GradientBoost.ipynb (tarync)
-  - Logistic Regression: LogisticRegression.ipynb (kearrooooooooooooooo)
-  - K-Nearest Neighbours: KNNeighbours.ipynb (kearrooooooooooooooo)
-  - Support Vector Machine: linear.ipynb, downsamp.ipynb, C_05.ipynb, starting,ipynb (KZ)
-  - Stacking with Multi-Layer Perceptron: m3_mlp.ipynb (KZ)
+#### tarync
+  - Decision Trees and Random Forest: DecisionTree.ipynb 
+  - Gradient Boosting with Decision Trees: GradientBoost.ipynb 
+ 
+#### kearrooooooooooooooo
+  - Logistic Regression: LogisticRegression.ipynb 
+  - K-Nearest Neighbours: KNNeighbours.ipynb 
+
+#### KZ
+  - Support Vector Machine: linear.ipynb, downsamp.ipynb, C_05.ipynb, starting,ipynb 
+  - Stacking with Multi-Layer Perceptron: m3_mlp.ipynb 
   
      
